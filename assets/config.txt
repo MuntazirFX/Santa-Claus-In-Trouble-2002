@@ -1,0 +1,7 @@
+Resolution 800 600
+Bitdepth 16
+Fullscreen 1
+UseFog 1
+Controller 2
+Music 85
+SFX 100

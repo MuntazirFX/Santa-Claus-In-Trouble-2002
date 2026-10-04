@@ -1,0 +1,37 @@
+name: SantaEngine
+options:
+  bundleIdPrefix: com.muntazirfx
+  deploymentTarget:
+    iOS: "15.0"
+targets:
+  SantaEngine:
+    type: application
+    platform: iOS
+    sources:
+      - platform/ios
+      - src
+      - path: assets               # original game data, original layout
+        type: folder
+        buildPhase: resources
+    dependencies:
+      - sdk: Metal.framework
+      - sdk: MetalKit.framework
+      - sdk: UIKit.framework
+      - sdk: QuartzCore.framework
+      - sdk: AVFoundation.framework
+    info:
+      path: platform/ios/Info.plist
+      properties:
+        CFBundleDisplayName: Santa Claus in Trouble
+        UILaunchScreen: {}
+        UIRequiresFullScreen: true
+        UISupportedInterfaceOrientations: [UIInterfaceOrientationLandscapeLeft, UIInterfaceOrientationLandscapeRight]
+        UIStatusBarHidden: true
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.muntazirfx.SantaEngine
+        HEADER_SEARCH_PATHS: $(SRCROOT)/src
+        CLANG_CXX_LANGUAGE_STANDARD: c++17
+        CODE_SIGNING_ALLOWED: NO
+        CODE_SIGNING_REQUIRED: NO
+        CODE_SIGN_IDENTITY: ""
