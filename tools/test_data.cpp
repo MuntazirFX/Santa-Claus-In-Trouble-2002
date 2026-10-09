@@ -6,7 +6,10 @@
 #include <string>
 int main(int argc, char** argv) {
     std::string dir = argc > 1 ? argv[1] : ".";
-    GameConfig c; printf("config: %d  %dx%d fog=%d music=%d sfx=%d\n", c.LoadFromFile((dir + "/config.txt").c_str()), c.width, c.height, c.useFog, c.music, c.sfx);
+    GameConfig c;
+    const bool configOK = c.LoadFromFile((dir + "/config.txt").c_str());
+    printf("config: %s  %dx%d fog=%d music=%d sfx=%d\n",
+           configOK ? "ok" : "FAIL", c.width, c.height, c.useFog, c.music, c.sfx);
     XpkPackage pkg; if (!pkg.Open((dir + "/xmas.xpk").c_str())) return 1;
     const char* lv[] = {"000","001","002","003","004","005","006","007","008","009","010","100","demo"};
     for (auto n : lv) { std::vector<LevelObject> o; bool ok = LoadLevel(pkg, std::string("levels\\") + n + ".dat", o);

@@ -20,13 +20,13 @@ targets:
       - sdk: QuartzCore.framework
       - sdk: AVFoundation.framework
     info:
-      path: platform/ios/Info.plist
       properties:
         CFBundleDisplayName: Santa Claus in Trouble
         UILaunchScreen: {}
         UIRequiresFullScreen: true
         UISupportedInterfaceOrientations: [UIInterfaceOrientationLandscapeLeft, UIInterfaceOrientationLandscapeRight]
         UIStatusBarHidden: true
+        UIApplicationSupportsIndirectInputEvents: true
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.muntazirfx.SantaEngine

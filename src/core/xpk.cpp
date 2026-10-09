@@ -1,5 +1,7 @@
 #include "core/xpk.h"
 #include <algorithm>
+#include <cstring>
+#include <sys/types.h>
 
 static bool ReadU32(FILE* f, uint32_t& v) {
     uint8_t b[4];
@@ -30,9 +32,15 @@ bool XpkPackage::Open(const char* path) {
     if (!f_) { fprintf(stderr, "Package file not found: '%s'\n", path); return false; }
     path_ = path;
 
-    fseek(f_, 0, SEEK_END);
-    long fileSize = ftell(f_);
-    fseek(f_, 0, SEEK_SET);
+#ifdef _WIN32
+    if (_fseeki64(f_, 0, SEEK_END) != 0) { Close(); return false; }
+    long long fileSize = _ftelli64(f_);
+    if (fileSize < 0 || _fseeki64(f_, 0, SEEK_SET) != 0) { Close(); return false; }
+#else
+    if (fseeko(f_, 0, SEEK_END) != 0) { Close(); return false; }
+    off_t fileSize = ftello(f_);
+    if (fileSize < 0 || fseeko(f_, 0, SEEK_SET) != 0) { Close(); return false; }
+#endif
 
     uint32_t n = 0, nameBlock = 0, total = 0;
     std::vector<uint32_t> nameOffs, sizes, skip;
@@ -53,14 +61,28 @@ bool XpkPackage::Open(const char* path) {
     // File data is stored at the end of the package, back to back.
     uint64_t sum = 0;
     for (uint32_t s : sizes) sum += s;
-    if (sum != total || sum > (uint64_t)fileSize) {
+    // Header must fit before the trailing data region. The original archive has
+    // two additional N-entry metadata tables between sizes and payload.
+#ifdef _WIN32
+    const uint64_t headerEnd = (uint64_t)_ftelli64(f_);
+#else
+    const uint64_t headerEnd = (uint64_t)ftello(f_);
+#endif
+    const uint64_t tableBytes = (uint64_t)n * 2u * sizeof(uint32_t);
+    if (sum != total || sum > (uint64_t)fileSize ||
+        headerEnd > (uint64_t)fileSize || tableBytes > (uint64_t)fileSize - headerEnd ||
+        sum > (uint64_t)fileSize - headerEnd - tableBytes) {
         fprintf(stderr, "Package size mismatch: '%s'\n", path); Close(); return false;
     }
     uint64_t pos = (uint64_t)fileSize - sum;
 
     for (uint32_t i = 0; i < n; ++i) {
         if (nameOffs[i] >= nameBlock) { Close(); return false; }
-        std::string name(&block[nameOffs[i]]);   // block is null-terminated per name
+        const char* begin = block.data() + nameOffs[i];
+        const size_t remaining = block.size() - nameOffs[i];
+        const void* terminator = memchr(begin, '\0', remaining);
+        if (!terminator) { Close(); return false; }
+        std::string name(begin, (const char*)terminator - begin);
         names_.push_back(name);
         entries_[Key(name)] = { pos, sizes[i] };
         pos += sizes[i];
