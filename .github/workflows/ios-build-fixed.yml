@@ -1,0 +1,90 @@
+name: iOS Build (unsigned IPA)
+
+on:
+  push:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: macos-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Locate SantaEngine project
+        id: project
+        shell: bash
+        run: |
+          if [ -f "$GITHUB_WORKSPACE/project.yml" ]; then
+            PROJECT_DIR="$GITHUB_WORKSPACE"
+          elif [ -f "$GITHUB_WORKSPACE/SantaEngine/project.yml" ]; then
+            PROJECT_DIR="$GITHUB_WORKSPACE/SantaEngine"
+          else
+            echo "Could not find project.yml at repository root or in ./SantaEngine" >&2
+            find "$GITHUB_WORKSPACE" -maxdepth 3 -name project.yml -print
+            exit 1
+          fi
+          echo "dir=$PROJECT_DIR" >> "$GITHUB_OUTPUT"
+          echo "Using project directory: $PROJECT_DIR"
+
+      - name: Install XcodeGen
+        run: brew install xcodegen
+
+      - name: Validate original game data parsers
+        working-directory: ${{ steps.project.outputs.dir }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          clang++ -std=c++17 -Wall -Wextra -Wpedantic -Isrc \
+            tools/test_data.cpp src/core/xpk.cpp src/core/config.cpp src/game/level.cpp \
+            -o "$RUNNER_TEMP/test_data"
+          "$RUNNER_TEMP/test_data" assets
+
+      - name: Generate Xcode project
+        working-directory: ${{ steps.project.outputs.dir }}
+        run: xcodegen generate --spec project.yml
+
+      - name: Build unsigned iOS app
+        working-directory: ${{ steps.project.outputs.dir }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          xcodebuild \
+            -project SantaEngine.xcodeproj \
+            -scheme SantaEngine \
+            -configuration Release \
+            -sdk iphoneos \
+            -derivedDataPath "$RUNNER_TEMP/santa-derived" \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGN_IDENTITY="" \
+            build
+
+      - name: Package unsigned IPA
+        shell: bash
+        working-directory: ${{ steps.project.outputs.dir }}
+        run: |
+          set -euo pipefail
+          APP_PATH="$RUNNER_TEMP/santa-derived/Build/Products/Release-iphoneos/SantaEngine.app"
+          IPA_DIR="$RUNNER_TEMP/santa-ipa"
+          if [ ! -d "$APP_PATH" ]; then
+            echo "Build succeeded but expected app was not found: $APP_PATH" >&2
+            exit 1
+          fi
+          rm -rf "$IPA_DIR"
+          mkdir -p "$IPA_DIR/Payload"
+          cp -R "$APP_PATH" "$IPA_DIR/Payload/SantaEngine.app"
+          (cd "$IPA_DIR" && /usr/bin/zip -qr "$GITHUB_WORKSPACE/SantaEngine-unsigned.ipa" Payload)
+          echo "Created $GITHUB_WORKSPACE/SantaEngine-unsigned.ipa"
+
+      - name: Upload unsigned IPA artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: SantaEngine-unsigned-IPA
+          path: SantaEngine-unsigned.ipa
+          if-no-files-found: error
+          retention-days: 7
