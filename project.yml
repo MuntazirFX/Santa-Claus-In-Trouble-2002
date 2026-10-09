@@ -8,9 +8,9 @@ targets:
     type: application
     platform: iOS
     sources:
-      - platform/ios
-      - src
-      - path: assets               # original game data, original layout
+      - path: platform/ios
+      - path: src
+      - path: assets
         type: folder
         buildPhase: resources
     dependencies:
